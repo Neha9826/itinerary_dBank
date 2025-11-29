@@ -2,12 +2,18 @@
 include 'includes/header.php'; 
 include 'config/db.php';
 
-// --- DATA FETCHING (ADMIN ONLY) ---
+// --- 1. DATA FETCHING (ADMIN) ---
 if($_SESSION['role'] == 'admin') {
     $emp_count = $conn->query("SELECT count(*) as total FROM users WHERE role='employee'")->fetch_assoc()['total'];
     $agent_count = $conn->query("SELECT count(*) as total FROM users WHERE role='agent'")->fetch_assoc()['total'];
     $master_count = $conn->query("SELECT count(*) as total FROM master_itineraries")->fetch_assoc()['total'];
     $sent_count = $conn->query("SELECT count(*) as total FROM sent_itineraries")->fetch_assoc()['total'];
+}
+
+// --- 2. DATA FETCHING (AGENT) ---
+if($_SESSION['role'] == 'agent') {
+    $my_id = $_SESSION['user_id'];
+    $total_received = $conn->query("SELECT count(*) as total FROM sent_itineraries WHERE agent_id = $my_id")->fetch_assoc()['total'];
 }
 ?>
 
@@ -26,53 +32,30 @@ if($_SESSION['role'] == 'admin') {
         <div class="row">
             <div class="col-lg-3 col-6">
                 <div class="small-box text-bg-primary">
-                    <div class="inner">
-                        <h3><?php echo $emp_count; ?></h3>
-                        <p>Total Employees</p>
-                    </div>
+                    <div class="inner"><h3><?php echo $emp_count; ?></h3><p>Total Employees</p></div>
                     <div class="small-box-icon"><i class="bi bi-people-fill"></i></div>
-                    <a href="manage_users.php?role=employee" class="small-box-footer link-light">
-                        Manage Emp <i class="bi bi-arrow-right-circle"></i>
-                    </a>
+                    <a href="manage_users.php?role=employee" class="small-box-footer link-light">Manage Emp <i class="bi bi-arrow-right-circle"></i></a>
                 </div>
             </div>
-            
             <div class="col-lg-3 col-6">
                 <div class="small-box text-bg-warning">
-                    <div class="inner">
-                        <h3><?php echo $agent_count; ?></h3>
-                        <p>Total Agents</p>
-                    </div>
+                    <div class="inner"><h3><?php echo $agent_count; ?></h3><p>Total Agents</p></div>
                     <div class="small-box-icon"><i class="bi bi-briefcase-fill"></i></div>
-                    <a href="manage_users.php?role=agent" class="small-box-footer link-dark">
-                        View Agents <i class="bi bi-arrow-right-circle"></i>
-                    </a>
+                    <a href="manage_users.php?role=agent" class="small-box-footer link-dark">View Agents <i class="bi bi-arrow-right-circle"></i></a>
                 </div>
             </div>
-
             <div class="col-lg-3 col-6">
                 <div class="small-box text-bg-success">
-                    <div class="inner">
-                        <h3><?php echo $master_count; ?></h3>
-                        <p>Master Itineraries</p>
-                    </div>
+                    <div class="inner"><h3><?php echo $master_count; ?></h3><p>Master Itineraries</p></div>
                     <div class="small-box-icon"><i class="bi bi-file-earmark-richtext"></i></div>
-                    <a href="view_masters.php" class="small-box-footer link-light">
-                        View All <i class="bi bi-arrow-right-circle"></i>
-                    </a>
+                    <a href="view_masters.php" class="small-box-footer link-light">View All <i class="bi bi-arrow-right-circle"></i></a>
                 </div>
             </div>
-
             <div class="col-lg-3 col-6">
                 <div class="small-box text-bg-danger">
-                    <div class="inner">
-                        <h3><?php echo $sent_count; ?></h3>
-                        <p>Itineraries Sent</p>
-                    </div>
+                    <div class="inner"><h3><?php echo $sent_count; ?></h3><p>Itineraries Sent</p></div>
                     <div class="small-box-icon"><i class="bi bi-send-fill"></i></div>
-                    <a href="all_sent_itineraries.php" class="small-box-footer link-light">
-                        More info <i class="bi bi-arrow-right-circle"></i>
-                    </a>
+                    <a href="all_sent_itineraries.php" class="small-box-footer link-light">More info <i class="bi bi-arrow-right-circle"></i></a>
                 </div>
             </div>
         </div>
@@ -106,25 +89,96 @@ if($_SESSION['role'] == 'admin') {
                 </div>
             </div>
         </div>
-        <?php endif; ?> 
+        <?php endif; ?>
+
+
+        <?php if($_SESSION['role'] == 'agent'): ?>
+        <div class="row">
+            <div class="col-lg-3 col-6">
+                <div class="small-box text-bg-warning">
+                    <div class="inner">
+                        <h3><?php echo $total_received; ?></h3>
+                        <p>Itineraries Received</p>
+                    </div>
+                    <div class="small-box-icon"><i class="bi bi-folder2-open"></i></div>
+                    <a href="my_itineraries.php" class="small-box-footer link-dark">
+                        View All <i class="bi bi-arrow-right-circle"></i>
+                    </a>
+                </div>
+            </div>
+            </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card card-outline card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">Recently Received</h3>
+                        <div class="card-tools">
+                            <a href="my_itineraries.php" class="btn btn-tool btn-sm">View Full Inbox</a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle text-nowrap">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>From</th>
+                                        <th>Price</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $my_id = $_SESSION['user_id'];
+                                    $sql = "SELECT s.*, u.name as emp_name 
+                                            FROM sent_itineraries s 
+                                            JOIN users u ON s.employee_id = u.id 
+                                            WHERE s.agent_id = $my_id 
+                                            ORDER BY s.sent_at DESC LIMIT 5";
+                                    $result = $conn->query($sql);
+
+                                    if($result->num_rows > 0):
+                                        while($row = $result->fetch_assoc()):
+                                    ?>
+                                    <tr>
+                                        <td class="fw-bold text-primary"><?php echo $row['custom_title']; ?></td>
+                                        <td><?php echo $row['emp_name']; ?></td>
+                                        <td class="text-success fw-bold">Rs. <?php echo number_format($row['final_price']); ?>/-</td>
+                                        <td><?php echo date('M d, h:i A', strtotime($row['sent_at'])); ?></td>
+                                        <td>
+                                            <a href="view_sent_itinerary.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
+                                            <a href="download_custom.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-outline-dark" title="Download"><i class="bi bi-download"></i></a>
+                                        </td>
+                                    </tr>
+                                    <?php endwhile; else: ?>
+                                    <tr><td colspan="5" class="text-center text-muted py-4">No recent itineraries.</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
 
         <?php if($_SESSION['role'] == 'employee'): ?>
             
         <?php
             $my_id = $_SESSION['user_id'];
             
-            // --- PART 1: TIMER LOGIC (Latest Session Only) ---
-            // We need this to determine if the "Clock" is running and if we are currently "On Break"
+            // 1. Timer Logic
             $latest_session = $conn->query("SELECT * FROM attendance WHERE user_id=$my_id ORDER BY id DESC LIMIT 1")->fetch_assoc();
-            
             $is_active_session = ($latest_session && $latest_session['logout_time'] == NULL);
             $current_att_id = $latest_session['id'] ?? 0;
             
-            // Check if we are currently on break in THIS active session
             $current_break_check = $conn->query("SELECT * FROM breaks WHERE attendance_id = $current_att_id AND end_time IS NULL LIMIT 1");
             $is_on_break = ($current_break_check->num_rows > 0);
 
-            // Calculate total break time ONLY for the current active session (for the timer deduction)
+            // Timer Calculation
             $session_breaks = $conn->query("SELECT start_time, end_time FROM breaks WHERE attendance_id = $current_att_id");
             $session_break_seconds = 0;
             $server_now = time();
@@ -137,15 +191,11 @@ if($_SESSION['role'] == 'admin') {
                 }
             }
 
-            // Javascript Variables
             $login_time_js = ($is_active_session && $latest_session) ? strtotime($latest_session['login_time']) * 1000 : 0;
             $server_time_js = time() * 1000;
 
-
-            // --- PART 2: DISPLAY LIST (All Breaks Today) ---
-            // This is purely for the "Today's Breaks" card. It fetches history across ALL sessions today.
-            $today_break_sql = "SELECT b.*, time(a.login_time) as session_start 
-                                FROM breaks b 
+            // 2. Break List
+            $today_break_sql = "SELECT b.* FROM breaks b 
                                 JOIN attendance a ON b.attendance_id = a.id 
                                 WHERE a.user_id = $my_id AND a.date = CURDATE() 
                                 ORDER BY b.start_time DESC";
@@ -193,9 +243,7 @@ if($_SESSION['role'] == 'admin') {
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
                                         <strong><?php echo htmlspecialchars($b['reason']); ?></strong><br>
-                                        <small class="text-muted">
-                                            <?php echo date('h:i A', strtotime($b['start_time'])); ?> - <?php echo $end; ?>
-                                        </small>
+                                        <small class="text-muted"><?php echo date('h:i A', strtotime($b['start_time'])); ?> - <?php echo $end; ?></small>
                                     </div>
                                     <?php if(!$b['end_time']): ?>
                                         <span class="badge bg-warning">Ongoing</span>
@@ -271,7 +319,6 @@ if($_SESSION['role'] == 'admin') {
             const loginTime = <?php echo $login_time_js; ?>;
             const initialBreakSeconds = <?php echo $session_break_seconds; ?>;
             const isOnBreak = <?php echo $is_on_break ? 'true' : 'false'; ?>;
-            
             const serverTimeAtLoad = <?php echo $server_time_js; ?>;
             const clientTimeAtLoad = new Date().getTime();
             const timeOffset = serverTimeAtLoad - clientTimeAtLoad;
@@ -279,40 +326,28 @@ if($_SESSION['role'] == 'admin') {
 
             function updateTimer() {
                 if (loginTime === 0) return;
-
                 const clientNow = new Date().getTime();
                 const serverNow = clientNow + timeOffset;
                 const serverNowSec = Math.floor(serverNow / 1000);
-                
                 let totalElapsed = serverNowSec - Math.floor(loginTime / 1000);
-                
                 let currentBreakDeduction = initialBreakSeconds;
-                if (isOnBreak) {
-                    currentBreakDeduction += (serverNowSec - pageLoadTimeSec);
-                }
-
+                if (isOnBreak) { currentBreakDeduction += (serverNowSec - pageLoadTimeSec); }
                 let diffInSeconds = totalElapsed - currentBreakDeduction;
                 if (diffInSeconds < 0) diffInSeconds = 0;
-
                 const hours = Math.floor(diffInSeconds / 3600);
                 const minutes = Math.floor((diffInSeconds % 3600) / 60);
                 const seconds = diffInSeconds % 60;
-
-                const formatted = 
-                    (hours < 10 ? "0" + hours : hours) + ":" + 
-                    (minutes < 10 ? "0" + minutes : minutes) + ":" + 
-                    (seconds < 10 ? "0" + seconds : seconds);
-
+                const formatted = (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":" + (seconds < 10 ? "0" + seconds : seconds);
                 const timerEl = document.getElementById("liveTimer");
                 if(timerEl) timerEl.innerText = formatted;
             }
-
             setInterval(updateTimer, 1000);
             updateTimer(); 
         });
         </script>
 
         <?php endif; ?>
+
     </div>
 </div>
 

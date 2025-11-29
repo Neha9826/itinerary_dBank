@@ -1,6 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
-// Simple check to ensure user is logged in
+// Check Login
 if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php' && basename($_SERVER['PHP_SELF']) != 'register.php') {
     header("Location: login.php");
     exit();
@@ -14,18 +14,18 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css" />
-    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css" />
-    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
-
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css">
 
     <link rel="stylesheet" href="./css/adminlte.css" />
+    
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 </head>
-<body class="layout-fixed sidebar-expand-lg sidebar-open bg-body-tertiary">
+
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
     <div class="app-wrapper">
         <nav class="app-header navbar navbar-expand bg-body">
             <div class="container-fluid">
@@ -37,13 +37,16 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item dropdown user-menu">
                         <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
-                            <span class="d-none d-md-inline">Welcome, <?php echo $_SESSION['name'] ?? 'User'; ?></span>
+                            <i class="bi bi-person-circle fs-5"></i> 
+                            <span class="d-none d-md-inline ms-1 fw-bold">
+                                <?php echo $_SESSION['name'] ?? 'User'; ?>
+                            </span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-end">
                             <li class="user-header text-bg-primary">
                                 <p>
-                                    <?php echo $_SESSION['name']; ?>
-                                    <small><?php echo ucfirst($_SESSION['role']); ?></small>
+                                    <?php echo $_SESSION['name'] ?? 'User'; ?>
+                                    <small><?php echo ucfirst($_SESSION['role'] ?? 'Member'); ?></small>
                                 </p>
                             </li>
                             <li class="user-footer">
@@ -59,7 +62,7 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
         <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
             <div class="sidebar-brand">
                 <a href="dashboard.php" class="brand-link">
-                    <span class="brand-text fw-light">ItinerarySys</span>
+                    <span class="brand-text fw-light">CareMyTrip.com</span>
                 </a>
             </div>
             <div class="sidebar-wrapper">
@@ -72,9 +75,25 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
                         </li>
                         
                         <?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'admin'): ?>
+                        <li class="nav-header">ADMINISTRATION</li>
                         <li class="nav-item">
                             <a href="create_itinerary.php" class="nav-link">
                                 <i class="nav-icon bi bi-plus-circle"></i> <p>Create Itinerary</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="view_masters.php" class="nav-link">
+                                <i class="nav-icon bi bi-file-earmark-text"></i> <p>Master Itineraries</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="all_sent_itineraries.php" class="nav-link">
+                                <i class="nav-icon bi bi-send"></i> <p>Sent History</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="manage_users.php" class="nav-link">
+                                <i class="nav-icon bi bi-people"></i> <p>Manage Users</p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -85,22 +104,24 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
                         <?php endif; ?>
 
                         <?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'employee'): ?>
-                            <li class="nav-item">
-                                <a href="view_masters.php" class="nav-link">
-                                    <i class="nav-icon bi bi-files"></i> <p>Browse Itineraries</p>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="sent_history.php" class="nav-link">
-                                    <i class="nav-icon bi bi-clock-history"></i> <p>Sent History</p>
-                                </a>
-                            </li>
+                        <li class="nav-header">EMPLOYEE MENU</li>
+                        <li class="nav-item">
+                            <a href="view_masters.php" class="nav-link">
+                                <i class="nav-icon bi bi-files"></i> <p>Browse Itineraries</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="sent_history.php" class="nav-link">
+                                <i class="nav-icon bi bi-clock-history"></i> <p>My Sent History</p>
+                            </a>
+                        </li>
                         <?php endif; ?>
                         
                          <?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'agent'): ?>
+                        <li class="nav-header">AGENT MENU</li>
                         <li class="nav-item">
                             <a href="my_itineraries.php" class="nav-link">
-                                <i class="nav-icon bi bi-folder"></i> <p>My Itineraries</p>
+                                <i class="nav-icon bi bi-folder"></i> <p>Received Itineraries</p>
                             </a>
                         </li>
                         <?php endif; ?>

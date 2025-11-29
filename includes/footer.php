@@ -1,5 +1,5 @@
 </main> <footer class="app-footer">
-            <div class="float-end d-none d-sm-inline">Itinerary System v1.0</div>
+            <div class="float-end d-none d-sm-inline">CareMyTrip.com</div>
             <strong>Copyright &copy; 2025.</strong> All rights reserved.
         </footer>
     </div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

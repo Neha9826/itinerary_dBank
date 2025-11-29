@@ -2,11 +2,29 @@
 include 'includes/header.php'; 
 include 'config/db.php';
 
-if(!isset($_GET['id'])) { header("Location: view_masters.php"); exit; }
+// Security Check
+if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+if(!isset($_GET['id'])) { header("Location: dashboard.php"); exit; }
 
 $id = $_GET['id'];
-$row = $conn->query("SELECT * FROM master_itineraries WHERE id=$id")->fetch_assoc();
-$data = json_decode($row['content'], true);
+
+// JOIN Query to get Custom Data + Master Images
+$sql = "SELECT s.*, m.header_image, m.footer_image 
+        FROM sent_itineraries s 
+        JOIN master_itineraries m ON s.master_itinerary_id = m.id 
+        WHERE s.id = $id";
+
+$result = $conn->query($sql);
+if($result->num_rows == 0) die("Itinerary not found or access denied.");
+
+$row = $result->fetch_assoc();
+
+// Check Permission (Only the specific Agent OR Admin/Employee can view)
+if($_SESSION['role'] == 'agent' && $row['agent_id'] != $_SESSION['user_id']) {
+    die("Access Denied: This itinerary was not sent to you.");
+}
+
+$data = json_decode($row['custom_content'], true);
 
 // Asset Paths
 $header_img = !empty($row['header_image']) ? './assets/uploads/itineraries/'.$row['header_image'] : '';
@@ -16,12 +34,10 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
 <div class="app-content-header">
     <div class="container-fluid">
         <div class="row">
-            <div class="col-sm-6"><h3>Itinerary Preview</h3></div>
+            <div class="col-sm-6"><h3>Preview: <?php echo $row['custom_title']; ?></h3></div>
             <div class="col-sm-6 text-end">
-                <a href="view_masters.php" class="btn btn-secondary">Back</a>
-                <a href="download_word.php?id=<?php echo $id; ?>" class="btn btn-primary">
-                    <i class="bi bi-file-word"></i> Download Word Doc
-                </a>
+                <button onclick="window.history.back()" class="btn btn-secondary me-2">Back</button>
+                <a href="download_custom.php?id=<?php echo $id; ?>" class="btn btn-primary"><i class="bi bi-download"></i> Download Doc</a>
             </div>
         </div>
     </div>
@@ -34,8 +50,6 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
                 
                 <?php if($header_img): ?>
                     <img src="<?php echo $header_img; ?>" style="width: 100%; height: auto; display: block;">
-                <?php else: ?>
-                    <div class="bg-primary text-white p-4 text-center"><h1><?php echo $row['title']; ?></h1></div>
                 <?php endif; ?>
 
                 <div class="p-5"> <h4 class="text-uppercase fw-bold text-primary mb-3 border-bottom pb-2">Program Overview</h4>
@@ -54,7 +68,7 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
                         </tr>
                         <tr>
                             <th class="bg-light">Cost</th>
-                            <td>₹<?php echo $data['program']['cost']; ?> (For <?php echo $data['program']['pax']; ?> Pax)</td>
+                            <td class="fw-bold text-success"><?php echo $data['program']['cost']; ?> (For <?php echo $data['program']['pax']; ?> Pax)</td>
                         </tr>
                         <tr>
                             <th class="bg-light">Inclusions</th>
@@ -99,7 +113,7 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
                             </h5>
                             <div class="ps-3 border-start border-3 border-success ms-2">
                                 <div class="text-muted mb-2">
-                                    <?php echo $day['desc']; // Summernote HTML is already safe ?>
+                                    <?php echo $day['desc']; ?>
                                 </div>
                                 
                                 <?php if(!empty($day['images'])): ?>

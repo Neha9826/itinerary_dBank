@@ -52,7 +52,7 @@ include 'config/db.php';
                         </div>
                         
                         <p class="card-text text-muted small">
-                            Base Price: <strong class="text-success fs-6">$<?php echo number_format($row['base_price']); ?></strong><br>
+                            Base Price: <strong class="text-success fs-6">₹<?php echo number_format($row['base_price']); ?></strong><br>
                             Destination: <?php echo $row['destination']; ?>
                         </p>
 
