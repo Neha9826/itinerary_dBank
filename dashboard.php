@@ -31,8 +31,8 @@ if($_SESSION['role'] == 'admin') {
                         <p>Total Employees</p>
                     </div>
                     <div class="small-box-icon"><i class="bi bi-people-fill"></i></div>
-                    <a href="manage_users.php" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
-                        Manage Users <i class="bi bi-link-45deg"></i>
+                    <a href="manage_users.php?role=employee" class="small-box-footer link-light">
+                        Manage Emp <i class="bi bi-arrow-right-circle"></i>
                     </a>
                 </div>
             </div>
@@ -44,8 +44,8 @@ if($_SESSION['role'] == 'admin') {
                         <p>Total Agents</p>
                     </div>
                     <div class="small-box-icon"><i class="bi bi-briefcase-fill"></i></div>
-                    <a href="manage_users.php" class="small-box-footer link-dark link-underline-opacity-0 link-underline-opacity-50-hover">
-                        View Agents <i class="bi bi-link-45deg"></i>
+                    <a href="manage_users.php?role=agent" class="small-box-footer link-dark">
+                        View Agents <i class="bi bi-arrow-right-circle"></i>
                     </a>
                 </div>
             </div>
@@ -57,8 +57,8 @@ if($_SESSION['role'] == 'admin') {
                         <p>Master Itineraries</p>
                     </div>
                     <div class="small-box-icon"><i class="bi bi-file-earmark-richtext"></i></div>
-                    <a href="create_itinerary.php" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
-                        Create New <i class="bi bi-plus-circle"></i>
+                    <a href="view_masters.php" class="small-box-footer link-light">
+                        View All <i class="bi bi-arrow-right-circle"></i>
                     </a>
                 </div>
             </div>
@@ -70,8 +70,8 @@ if($_SESSION['role'] == 'admin') {
                         <p>Itineraries Sent</p>
                     </div>
                     <div class="small-box-icon"><i class="bi bi-send-fill"></i></div>
-                    <a href="#" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
-                        More info <i class="bi bi-link-45deg"></i>
+                    <a href="all_sent_itineraries.php" class="small-box-footer link-light">
+                        More info <i class="bi bi-arrow-right-circle"></i>
                     </a>
                 </div>
             </div>
@@ -83,17 +83,9 @@ if($_SESSION['role'] == 'admin') {
                     <div class="card-header"><h3 class="card-title">Recent System Activity</h3></div>
                     <div class="card-body p-0">
                         <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Activity</th>
-                                    <th>User</th>
-                                    <th>Time</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>#</th><th>Activity</th><th>User</th><th>Time</th></tr></thead>
                             <tbody>
                                 <?php
-                                // Fetch last 5 sent itineraries as "activity"
                                 $act_sql = "SELECT s.custom_title, u.name, s.sent_at 
                                             FROM sent_itineraries s 
                                             JOIN users u ON s.employee_id = u.id 
@@ -114,40 +106,50 @@ if($_SESSION['role'] == 'admin') {
                 </div>
             </div>
         </div>
-        <?php 
-            endif; 
-            if($_SESSION['role'] == 'employee'): 
+        <?php endif; ?> 
 
+        <?php if($_SESSION['role'] == 'employee'): ?>
+            
+        <?php
             $my_id = $_SESSION['user_id'];
-            // 1. Get the LATEST session
-            $today_att = $conn->query("SELECT * FROM attendance WHERE user_id=$my_id AND date = CURDATE() ORDER BY id DESC LIMIT 1")->fetch_assoc();
-            $att_id = $today_att['id'] ?? 0;
             
-            // 2. Get Breaks & Determine Status
-            $breaks = $conn->query("SELECT * FROM breaks WHERE attendance_id = $att_id ORDER BY start_time DESC");
+            // --- PART 1: TIMER LOGIC (Latest Session Only) ---
+            // We need this to determine if the "Clock" is running and if we are currently "On Break"
+            $latest_session = $conn->query("SELECT * FROM attendance WHERE user_id=$my_id ORDER BY id DESC LIMIT 1")->fetch_assoc();
             
-            $is_on_break = false;
-            $total_break_seconds = 0;
-            $server_now = time(); // PHP Server Time
+            $is_active_session = ($latest_session && $latest_session['logout_time'] == NULL);
+            $current_att_id = $latest_session['id'] ?? 0;
+            
+            // Check if we are currently on break in THIS active session
+            $current_break_check = $conn->query("SELECT * FROM breaks WHERE attendance_id = $current_att_id AND end_time IS NULL LIMIT 1");
+            $is_on_break = ($current_break_check->num_rows > 0);
 
-            // Calculate total break time (including ongoing ones)
-            // We need to loop through this once for calculation, then reset for display
-            $break_data = []; 
-            while($b = $breaks->fetch_assoc()) {
-                $break_data[] = $b; // Store for display loop later
-                
-                if($b['end_time'] == NULL) {
-                    $is_on_break = true; // Found an active break
-                    // Add time from Start until NOW
-                    $total_break_seconds += ($server_now - strtotime($b['start_time']));
+            // Calculate total break time ONLY for the current active session (for the timer deduction)
+            $session_breaks = $conn->query("SELECT start_time, end_time FROM breaks WHERE attendance_id = $current_att_id");
+            $session_break_seconds = 0;
+            $server_now = time();
+
+            while($sb = $session_breaks->fetch_assoc()) {
+                if($sb['end_time'] == NULL) {
+                    $session_break_seconds += ($server_now - strtotime($sb['start_time']));
                 } else {
-                    // Add finished break time
-                    $total_break_seconds += (strtotime($b['end_time']) - strtotime($b['start_time']));
+                    $session_break_seconds += (strtotime($sb['end_time']) - strtotime($sb['start_time']));
                 }
             }
 
-            // Pass Login Time to JavaScript
-            $login_time_js = $today_att ? strtotime($today_att['login_time']) * 1000 : 0;
+            // Javascript Variables
+            $login_time_js = ($is_active_session && $latest_session) ? strtotime($latest_session['login_time']) * 1000 : 0;
+            $server_time_js = time() * 1000;
+
+
+            // --- PART 2: DISPLAY LIST (All Breaks Today) ---
+            // This is purely for the "Today's Breaks" card. It fetches history across ALL sessions today.
+            $today_break_sql = "SELECT b.*, time(a.login_time) as session_start 
+                                FROM breaks b 
+                                JOIN attendance a ON b.attendance_id = a.id 
+                                WHERE a.user_id = $my_id AND a.date = CURDATE() 
+                                ORDER BY b.start_time DESC";
+            $all_todays_breaks = $conn->query($today_break_sql);
         ?>
 
         <div class="row">
@@ -155,47 +157,57 @@ if($_SESSION['role'] == 'admin') {
                 <div class="card mb-4 <?php echo $is_on_break ? 'card-warning' : 'card-success'; ?> card-outline">
                     <div class="card-header"><h5 class="card-title">Attendance Action</h5></div>
                     <div class="card-body text-center">
-                        <p class="fs-4 mb-1">Status: <strong><?php echo $is_on_break ? '☕ On Break' : '✅ Working'; ?></strong></p>
+                        <p class="fs-4 mb-1">Status: <strong><?php echo $is_on_break ? '☕ On Break' : ($is_active_session ? '✅ Working' : '🔴 Signed Out'); ?></strong></p>
                         
                         <div class="bg-dark text-white rounded p-2 mb-3 shadow-sm">
                             <small>SESSION DURATION</small>
                             <h2 id="liveTimer" class="fw-bold m-0">00:00:00</h2>
                         </div>
                         
-                        <p class="small text-muted">Login Time: <?php echo $today_att ? date('h:i A', strtotime($today_att['login_time'])) : 'Not Logged In'; ?></p>
+                        <p class="small text-muted">Login Time: <?php echo ($latest_session && $is_active_session) ? date('h:i A', strtotime($latest_session['login_time'])) : '--:--'; ?></p>
                         
-                        <?php if($is_on_break): ?>
-                            <form action="actions/time_track.php" method="POST">
-                                <input type="hidden" name="action" value="end_break">
-                                <button class="btn btn-warning btn-lg w-100 fw-bold">Resume Work</button>
-                            </form>
+                        <?php if($is_active_session): ?>
+                            <?php if($is_on_break): ?>
+                                <form action="actions/time_track.php" method="POST">
+                                    <input type="hidden" name="action" value="end_break">
+                                    <button class="btn btn-warning btn-lg w-100 fw-bold">Resume Work</button>
+                                </form>
+                            <?php else: ?>
+                                <button class="btn btn-outline-danger btn-lg w-100" data-bs-toggle="modal" data-bs-target="#breakModal">
+                                    Take a Break
+                                </button>
+                            <?php endif; ?>
                         <?php else: ?>
-                            <button class="btn btn-outline-danger btn-lg w-100" data-bs-toggle="modal" data-bs-target="#breakModal">
-                                Take a Break
-                            </button>
+                            <div class="alert alert-secondary py-1">Session Closed</div>
                         <?php endif; ?>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-header bg-secondary text-white">Today's Breaks</div>
-                    <ul class="list-group list-group-flush">
-                        <?php 
-                        if(!empty($break_data)): 
-                            foreach($break_data as $b): 
+                    <div class="card-header bg-secondary text-white">All Breaks Today</div>
+                    <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                        <ul class="list-group list-group-flush">
+                            <?php if($all_todays_breaks->num_rows > 0): while($b = $all_todays_breaks->fetch_assoc()): 
                                 $end = $b['end_time'] ? date('h:i A', strtotime($b['end_time'])) : 'Active';
-                        ?>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong><?php echo $b['reason']; ?></strong><br>
-                                    <small class="text-muted"><?php echo date('h:i A', strtotime($b['start_time'])); ?> - <?php echo $end; ?></small>
-                                </div>
-                                <?php if(!$b['end_time']): ?><span class="badge bg-warning">Ongoing</span><?php endif; ?>
-                            </li>
-                        <?php endforeach; else: ?>
-                            <li class="list-group-item text-muted">No breaks taken today.</li>
-                        <?php endif; ?>
-                    </ul>
+                            ?>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><?php echo htmlspecialchars($b['reason']); ?></strong><br>
+                                        <small class="text-muted">
+                                            <?php echo date('h:i A', strtotime($b['start_time'])); ?> - <?php echo $end; ?>
+                                        </small>
+                                    </div>
+                                    <?php if(!$b['end_time']): ?>
+                                        <span class="badge bg-warning">Ongoing</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-success">Done</span>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endwhile; else: ?>
+                                <li class="list-group-item text-muted text-center p-3">No breaks taken today.</li>
+                            <?php endif; ?>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -204,14 +216,7 @@ if($_SESSION['role'] == 'admin') {
                     <div class="card-header border-0"><h3 class="card-title">My Work History (Last 7 Days)</h3></div>
                     <div class="card-body table-responsive p-0">
                         <table class="table table-striped table-valign-middle">
-                            <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Login</th>
-                                <th>Logout</th>
-                                <th>Total Work</th>
-                            </tr>
-                            </thead>
+                            <thead><tr><th>Date</th><th>Login</th><th>Logout</th><th>Total Work</th></tr></thead>
                             <tbody>
                             <?php 
                                 $hist_sql = "SELECT * FROM attendance WHERE user_id=$my_id ORDER BY id DESC LIMIT 7";
@@ -244,7 +249,7 @@ if($_SESSION['role'] == 'admin') {
                             <input type="hidden" name="action" value="start_break">
                             <div class="mb-3">
                                 <label class="form-label">Select Reason</label>
-                                <select name="reason" class="form-select select2-dynamic" style="width:100%">
+                                <select name="reason" class="form-select" style="width:100%" required>
                                     <option value="Lunch Break">Lunch Break</option>
                                     <option value="Tea/Coffee Break">Tea/Coffee Break</option>
                                     <option value="Personal Emergency">Personal Emergency</option>
@@ -263,33 +268,30 @@ if($_SESSION['role'] == 'admin') {
 
         <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Server passing calculated break seconds (including ongoing ones)
             const loginTime = <?php echo $login_time_js; ?>;
-            const initialBreakSeconds = <?php echo $total_break_seconds; ?>;
+            const initialBreakSeconds = <?php echo $session_break_seconds; ?>;
             const isOnBreak = <?php echo $is_on_break ? 'true' : 'false'; ?>;
             
-            // We need to track how much break time accumulates while sitting on this page
-            let pageLoadTime = Math.floor(new Date().getTime() / 1000);
+            const serverTimeAtLoad = <?php echo $server_time_js; ?>;
+            const clientTimeAtLoad = new Date().getTime();
+            const timeOffset = serverTimeAtLoad - clientTimeAtLoad;
+            let pageLoadTimeSec = Math.floor(serverTimeAtLoad / 1000);
 
             function updateTimer() {
                 if (loginTime === 0) return;
 
-                const now = new Date().getTime();
-                const nowSec = Math.floor(now / 1000);
+                const clientNow = new Date().getTime();
+                const serverNow = clientNow + timeOffset;
+                const serverNowSec = Math.floor(serverNow / 1000);
                 
-                // Calculate total Seconds since login
-                let totalElapsed = nowSec - Math.floor(loginTime / 1000);
+                let totalElapsed = serverNowSec - Math.floor(loginTime / 1000);
                 
-                // If on break, the "Break Deduction" grows every second
                 let currentBreakDeduction = initialBreakSeconds;
                 if (isOnBreak) {
-                    // Add seconds passed since page loaded
-                    currentBreakDeduction += (nowSec - pageLoadTime);
+                    currentBreakDeduction += (serverNowSec - pageLoadTimeSec);
                 }
 
-                // WORKED TIME = Total Elapsed - Total Breaks
                 let diffInSeconds = totalElapsed - currentBreakDeduction;
-
                 if (diffInSeconds < 0) diffInSeconds = 0;
 
                 const hours = Math.floor(diffInSeconds / 3600);
@@ -301,16 +303,16 @@ if($_SESSION['role'] == 'admin') {
                     (minutes < 10 ? "0" + minutes : minutes) + ":" + 
                     (seconds < 10 ? "0" + seconds : seconds);
 
-                document.getElementById("liveTimer").innerText = formatted;
+                const timerEl = document.getElementById("liveTimer");
+                if(timerEl) timerEl.innerText = formatted;
             }
 
             setInterval(updateTimer, 1000);
-            updateTimer();
+            updateTimer(); 
         });
         </script>
 
         <?php endif; ?>
-
     </div>
 </div>
 

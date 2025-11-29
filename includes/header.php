@@ -77,14 +77,24 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
                                 <i class="nav-icon bi bi-plus-circle"></i> <p>Create Itinerary</p>
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a href="attendance_report.php" class="nav-link">
+                                <i class="nav-icon bi bi-calendar-check"></i> <p>Attendance Reports</p>
+                            </a>
+                        </li>
                         <?php endif; ?>
 
                         <?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'employee'): ?>
-                        <li class="nav-item">
-                            <a href="view_masters.php" class="nav-link">
-                                <i class="nav-icon bi bi-files"></i> <p>Browse Itineraries</p>
-                            </a>
-                        </li>
+                            <li class="nav-item">
+                                <a href="view_masters.php" class="nav-link">
+                                    <i class="nav-icon bi bi-files"></i> <p>Browse Itineraries</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="sent_history.php" class="nav-link">
+                                    <i class="nav-icon bi bi-clock-history"></i> <p>Sent History</p>
+                                </a>
+                            </li>
                         <?php endif; ?>
                         
                          <?php if(isset($_SESSION['role']) && $_SESSION['role'] == 'agent'): ?>
