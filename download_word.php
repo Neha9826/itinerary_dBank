@@ -149,7 +149,9 @@ echo "<head><meta charset='utf-8'><title>" . $row['title'] . "</title>";
             $path = './assets/uploads/itineraries/'.$day['images'][0];
             $day_img_src = imageToBase64($path);
         }
-        $clean_desc = strip_tags($day['desc'], '<br><p><b><strong>');
+        // $clean_desc = strip_tags($day['desc'], '<br><p><b><strong>');
+        // ALLOW LIST TAGS (ul, ol, li) so they don't get flattened
+        $clean_desc = strip_tags($day['desc'], '<br><p><b><strong><ul><ol><li>');
         $is_even = ($i % 2 == 0);
     ?>
 

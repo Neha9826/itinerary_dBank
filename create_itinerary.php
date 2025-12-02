@@ -187,13 +187,19 @@ if($_SESSION['role'] != 'admin') { echo "<script>window.location.href='dashboard
                     <input type="text" name="sections[${sectionCount}][heading]" class="form-control fw-bold" placeholder="Heading (e.g. Exclusions)">
                 </div>
                 <div class="col-md-7">
-                    <textarea name="sections[${sectionCount}][content]" class="form-control" rows="2" placeholder="Details..."></textarea>
+                    <textarea name="sections[${sectionCount}][content]" class="form-control summernote" rows="2" placeholder="Details..."></textarea>
                 </div>
                 <div class="col-md-1">
                     <button type="button" class="btn btn-danger btn-sm" onclick="$('#secRow${sectionCount}').remove()"><i class="bi bi-trash"></i></button>
                 </div>
             </div>`;
             $('#sectionContainer').append(html);
+
+            // INITIALIZE EDITOR FOR THE NEW FIELD
+            $(`#secRow${sectionCount} .summernote`).summernote({
+                height: 100, // Slightly smaller height for sections
+                toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['para', ['ul', 'ol', 'paragraph']]]
+            });
         });
 
         // Trigger one hotel and one day on load

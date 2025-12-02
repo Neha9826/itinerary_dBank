@@ -2,46 +2,44 @@
 include 'includes/header.php'; 
 include 'config/db.php';
 
-// Check Employee Access
-if($_SESSION['role'] != 'employee' && $_SESSION['role'] != 'admin') { 
-    echo "<script>window.location.href='dashboard.php';</script>"; exit; 
-}
+// Only Admin
+if($_SESSION['role'] != 'admin') { echo "<script>window.location.href='dashboard.php';</script>"; exit; }
 
 $id = $_GET['id'];
 $master = $conn->query("SELECT * FROM master_itineraries WHERE id=$id")->fetch_assoc();
 $data = json_decode($master['content'], true);
-
-// Fetch Agents for Dropdown
-$agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
 ?>
 
 <div class="app-content-header">
     <div class="container-fluid">
-        <h3>Customize Itinerary: <span class="text-primary"><?php echo $master['title']; ?></span></h3>
+        <h3>Edit Master Itinerary: <span class="text-primary"><?php echo $master['title']; ?></span></h3>
     </div>
 </div>
 
 <div class="app-content">
     <div class="container-fluid">
-        <form action="actions/save_custom_complex.php" method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="master_id" value="<?php echo $master['id']; ?>">
+        <form action="actions/update_master_itinerary.php" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="id" value="<?php echo $master['id']; ?>">
             
             <div class="card card-outline card-primary mb-4">
-                <div class="card-header"><h5 class="card-title">Quote Details</h5></div>
+                <div class="card-header"><h5 class="card-title">Part 0: PDF Branding</h5></div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label>Custom Title (For Agent)</label>
-                            <input type="text" name="custom_title" class="form-control" value="Quote: <?php echo $master['title']; ?>">
+                        <div class="col-md-6">
+                            <label class="form-label">Header Image</label>
+                            <?php if($master['header_image']): ?>
+                                <div class="mb-2"><img src="./assets/uploads/itineraries/<?php echo $master['header_image']; ?>" height="60"></div>
+                            <?php endif; ?>
+                            <input type="file" name="header_image" class="form-control" accept="image/*">
+                            <input type="hidden" name="old_header_image" value="<?php echo $master['header_image']; ?>">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label>Select Agent</label>
-                            <select name="agent_id" class="form-control" required>
-                                <option value="">-- Select Agent --</option>
-                                <?php while($agent = $agents->fetch_assoc()): ?>
-                                    <option value="<?php echo $agent['id']; ?>"><?php echo $agent['name']; ?></option>
-                                <?php endwhile; ?>
-                            </select>
+                        <div class="col-md-6">
+                            <label class="form-label">Footer Image</label>
+                            <?php if($master['footer_image']): ?>
+                                <div class="mb-2"><img src="./assets/uploads/itineraries/<?php echo $master['footer_image']; ?>" height="60"></div>
+                            <?php endif; ?>
+                            <input type="file" name="footer_image" class="form-control" accept="image/*">
+                            <input type="hidden" name="old_footer_image" value="<?php echo $master['footer_image']; ?>">
                         </div>
                     </div>
                 </div>
@@ -67,11 +65,11 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                     
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label>Final Cost (Edit for Margin)</label>
-                            <input type="text" name="cost" class="form-control fw-bold text-success" value="<?php echo $data['program']['cost']; ?>">
+                            <label>Cost Per Person</label>
+                            <input type="text" name="cost" class="form-control" value="<?php echo $data['program']['cost']; ?>">
                         </div>
                         <div class="col-md-4">
-                            <label>For Pax Size</label>
+                            <label>Pax Size</label>
                             <input type="number" name="pax_size" class="form-control" value="<?php echo $data['program']['pax']; ?>">
                         </div>
                         <div class="col-md-4">
@@ -103,10 +101,7 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                         <table class="table table-bordered">
                             <thead><tr><th>Location</th><th>Hotel Name</th><th>Nights</th><th>Action</th></tr></thead>
                             <tbody id="hotelContainer">
-                                <?php 
-                                $hCount = 0;
-                                if(!empty($data['hotels'])): foreach($data['hotels'] as $hotel): $hCount++; 
-                                ?>
+                                <?php $hCount = 0; if(!empty($data['hotels'])): foreach($data['hotels'] as $hotel): $hCount++; ?>
                                 <tr id="hotelRow_<?php echo $hCount; ?>">
                                     <td><input type="text" name="hotels[<?php echo $hCount; ?>][location]" class="form-control" value="<?php echo $hotel['location']; ?>"></td>
                                     <td><input type="text" name="hotels[<?php echo $hCount; ?>][name]" class="form-control" value="<?php echo $hotel['name']; ?>"></td>
@@ -126,10 +121,7 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                     <button type="button" class="btn btn-sm btn-dark" id="addDayBtn"><i class="bi bi-plus-circle"></i> Add Day</button>
                 </div>
                 <div class="card-body" id="itineraryContainer">
-                    <?php 
-                    $dCount = 0;
-                    if(!empty($data['timeline'])): foreach($data['timeline'] as $day): $dCount++; 
-                    ?>
+                    <?php $dCount = 0; if(!empty($data['timeline'])): foreach($data['timeline'] as $day): $dCount++; ?>
                     <div class="border rounded p-3 mb-3 bg-light position-relative" id="dayRow_<?php echo $dCount; ?>">
                         <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2" onclick="$('#dayRow_<?php echo $dCount; ?>').remove()">X</button>
                         <div class="mb-2">
@@ -143,7 +135,7 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                         
                         <?php if(!empty($day['images'])): ?>
                             <div class="mb-2">
-                                <small>Existing Images:</small><br>
+                                <small>Current Images:</small><br>
                                 <?php foreach($day['images'] as $img): ?>
                                     <img src="./assets/uploads/itineraries/<?php echo $img; ?>" height="50" class="me-1 border">
                                     <input type="hidden" name="days[<?php echo $dCount; ?>][existing_images][]" value="<?php echo $img; ?>">
@@ -152,7 +144,7 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                         <?php endif; ?>
 
                         <div class="mb-2">
-                            <label>Add New Images</label>
+                            <label>Add More Images</label>
                             <input type="file" name="day_images_<?php echo $dCount; ?>[]" class="form-control" multiple>
                         </div>
                     </div>
@@ -183,8 +175,8 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
             </div>
 
             <div class="fixed-bottom bg-white p-3 shadow border-top text-end">
-                <a href="view_masters.php" class="btn btn-secondary me-2">Cancel</a>
-                <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-send-fill"></i> Send to Agent</button>
+                <a href="preview_itinerary.php?id=<?php echo $id; ?>" class="btn btn-secondary me-2">Cancel</a>
+                <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-check-circle"></i> Update Itinerary</button>
             </div>
             <br><br><br>
 
@@ -194,27 +186,18 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
 
 <?php include 'includes/footer.php'; ?>
 
-<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
-
 <script>
     $(document).ready(function() {
-        // Initialize Summernote on existing textareas
-        $('.summernote').summernote({
-            height: 150,
-            toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['para', ['ul', 'ol', 'paragraph']]]
-        });
+        $('.summernote').summernote({ height: 150 });
 
-        // COUNTERS (Start from existing count)
         let hotelCount = <?php echo $hCount; ?>;
         let dayCount = <?php echo $dCount; ?>;
         let sectionCount = <?php echo $sCount; ?>;
 
-        // --- 1. ADD HOTEL ---
         $('#addHotelBtn').click(function() {
             hotelCount++;
-            let html = `
-            <tr id="hotelRow_${hotelCount}">
+            let html = `<tr id="hotelRow_${hotelCount}">
                 <td><input type="text" name="hotels[${hotelCount}][location]" class="form-control"></td>
                 <td><input type="text" name="hotels[${hotelCount}][name]" class="form-control"></td>
                 <td><input type="text" name="hotels[${hotelCount}][nights]" class="form-control"></td>
@@ -223,35 +206,18 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
             $('#hotelContainer').append(html);
         });
 
-        // --- 2. ADD DAY ---
         $('#addDayBtn').click(function() {
             dayCount++;
-            let html = `
-            <div class="border rounded p-3 mb-3 bg-light position-relative" id="dayRow_${dayCount}">
+            let html = `<div class="border rounded p-3 mb-3 bg-light position-relative" id="dayRow_${dayCount}">
                 <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2" onclick="$('#dayRow_${dayCount}').remove()">X</button>
-                <div class="mb-2">
-                    <label class="fw-bold">Day Title</label>
-                    <input type="text" name="days[${dayCount}][title]" class="form-control" placeholder="Day Title">
-                </div>
-                <div class="mb-2">
-                    <label>Description</label>
-                    <textarea name="days[${dayCount}][desc]" class="summernote"></textarea>
-                </div>
-                <div class="mb-2">
-                    <label>New Images</label>
-                    <input type="file" name="day_images_${dayCount}[]" class="form-control" multiple>
-                </div>
+                <div class="mb-2"><label class="fw-bold">Day Title</label><input type="text" name="days[${dayCount}][title]" class="form-control"></div>
+                <div class="mb-2"><label>Description</label><textarea name="days[${dayCount}][desc]" class="summernote"></textarea></div>
+                <div class="mb-2"><label>New Images</label><input type="file" name="day_images_${dayCount}[]" class="form-control" multiple></div>
             </div>`;
             $('#itineraryContainer').append(html);
-            
-            // Init Summernote for new element
-            $(`#dayRow_${dayCount} .summernote`).summernote({
-                height: 150,
-                toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['para', ['ul', 'ol', 'paragraph']]]
-            });
+            $(`#dayRow_${dayCount} .summernote`).summernote({ height: 150 });
         });
 
-        // --- 3. ADD SECTION ---
         $('#addSectionBtn').click(function() {
             sectionCount++;
             let html = `
