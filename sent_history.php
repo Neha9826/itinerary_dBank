@@ -45,7 +45,6 @@ $my_id = $_SESSION['user_id'];
                         </thead>
                         <tbody>
                             <?php
-                            // Join with Users table to get Agent Name
                             $sql = "SELECT s.*, u.name as agent_name 
                                     FROM sent_itineraries s 
                                     JOIN users u ON s.agent_id = u.id 
@@ -73,17 +72,23 @@ $my_id = $_SESSION['user_id'];
                                     <?php echo date('M d, Y h:i A', strtotime($row['sent_at'])); ?>
                                 </td>
                                 <td>
-                                    <a href="download_custom.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-outline-dark">
-                                        <i class="bi bi-file-word"></i> Download Doc
-                                    </a>
+                                    <div class="btn-group">
+                                        <a href="view_sent_itinerary.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-info text-white" title="View & Forward">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="customize_itinerary.php?sent_id=<?php echo $row['id']; ?>" class="btn btn-sm btn-warning text-dark" title="Edit & Resend">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+                                        
+                                        <a href="download_custom.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-dark" title="Download Word">
+                                            <i class="bi bi-file-word"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endwhile; else: ?>
                             <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">
-                                    <i class="bi bi-inbox fs-1"></i><br>
-                                    No itineraries sent yet.
-                                </td>
+                                <td colspan="6" class="text-center py-4 text-muted">No itineraries sent yet.</td>
                             </tr>
                             <?php endif; ?>
                         </tbody>

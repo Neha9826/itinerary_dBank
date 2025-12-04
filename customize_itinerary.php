@@ -2,22 +2,59 @@
 include 'includes/header.php'; 
 include 'config/db.php';
 
-// Check Employee Access
+// Check Employee/Admin Access
 if($_SESSION['role'] != 'employee' && $_SESSION['role'] != 'admin') { 
     echo "<script>window.location.href='dashboard.php';</script>"; exit; 
 }
 
-$id = $_GET['id'];
-$master = $conn->query("SELECT * FROM master_itineraries WHERE id=$id")->fetch_assoc();
-$data = json_decode($master['content'], true);
+$data = [];
+$master = [];
+$prefill_title = "";
+$prefill_agent = "";
+$is_edit_mode = false;
 
-// Fetch Agents for Dropdown
+// --- LOGIC 1: EDITING A PREVIOUSLY SENT ITINERARY ---
+if (isset($_GET['sent_id'])) {
+    $sent_id = $_GET['sent_id'];
+    $sent_row = $conn->query("SELECT * FROM sent_itineraries WHERE id=$sent_id")->fetch_assoc();
+    
+    if(!$sent_row) die("Itinerary not found");
+
+    // Get the original Master ID (needed for database linkage)
+    $master_id = $sent_row['master_itinerary_id'];
+    $master = $conn->query("SELECT * FROM master_itineraries WHERE id=$master_id")->fetch_assoc();
+    
+    // Load the CUSTOM content (The edited version)
+    $data = json_decode($sent_row['custom_content'], true);
+    
+    $prefill_title = $sent_row['custom_title'] . " (Rev)";
+    $prefill_agent = $sent_row['agent_id'];
+    $is_edit_mode = true;
+
+// --- LOGIC 2: CREATING NEW FROM MASTER ---
+} elseif (isset($_GET['id'])) {
+    $id = $_GET['id'];
+    $master = $conn->query("SELECT * FROM master_itineraries WHERE id=$id")->fetch_assoc();
+    
+    // Load the MASTER content
+    $data = json_decode($master['content'], true);
+    
+    $prefill_title = "Quote: " . $master['title'];
+    $prefill_agent = "";
+} else {
+    header("Location: view_masters.php"); exit;
+}
+
+// Fetch Agents
 $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
 ?>
 
 <div class="app-content-header">
     <div class="container-fluid">
-        <h3>Customize Itinerary: <span class="text-primary"><?php echo $master['title']; ?></span></h3>
+        <h3>
+            <?php echo $is_edit_mode ? 'Edit Quote: ' : 'Customize: '; ?> 
+            <span class="text-primary"><?php echo $master['title']; ?></span>
+        </h3>
     </div>
 </div>
 
@@ -31,15 +68,19 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label>Custom Title (For Agent)</label>
-                            <input type="text" name="custom_title" class="form-control" value="Quote: <?php echo $master['title']; ?>">
+                            <label>Custom Title</label>
+                            <input type="text" name="custom_title" class="form-control" value="<?php echo $prefill_title; ?>">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label>Select Agent</label>
                             <select name="agent_id" class="form-control" required>
                                 <option value="">-- Select Agent --</option>
-                                <?php while($agent = $agents->fetch_assoc()): ?>
-                                    <option value="<?php echo $agent['id']; ?>"><?php echo $agent['name']; ?></option>
+                                <?php 
+                                $agents->data_seek(0);
+                                while($agent = $agents->fetch_assoc()): 
+                                    $selected = ($agent['id'] == $prefill_agent) ? 'selected' : '';
+                                ?>
+                                    <option value="<?php echo $agent['id']; ?>" <?php echo $selected; ?>><?php echo $agent['name']; ?></option>
                                 <?php endwhile; ?>
                             </select>
                         </div>
@@ -67,7 +108,7 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                     
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label>Final Cost (Edit for Margin)</label>
+                            <label>Final Cost</label>
                             <input type="text" name="cost" class="form-control fw-bold text-success" value="<?php echo $data['program']['cost']; ?>">
                         </div>
                         <div class="col-md-4">
@@ -143,7 +184,7 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                         
                         <?php if(!empty($day['images'])): ?>
                             <div class="mb-2">
-                                <small>Existing Images:</small><br>
+                                <small>Keep Existing Images:</small><br>
                                 <?php foreach($day['images'] as $img): ?>
                                     <img src="./assets/uploads/itineraries/<?php echo $img; ?>" height="50" class="me-1 border">
                                     <input type="hidden" name="days[<?php echo $dCount; ?>][existing_images][]" value="<?php echo $img; ?>">
@@ -166,25 +207,28 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
                     <button type="button" class="btn btn-sm btn-dark" id="addSectionBtn"><i class="bi bi-plus"></i> Add Section</button>
                 </div>
                 <div class="card-body" id="sectionContainer">
-                    <?php $sCount = 0; if(!empty($data['sections'])): foreach($data['sections'] as $sec): $sCount++; ?>
-                        <div class="row mb-3" id="secRow_<?php echo $sCount; ?>">
-                            <div class="col-md-4">
-                                <input type="text" name="sections[<?php echo $sCount; ?>][heading]" class="form-control fw-bold" value="<?php echo $sec['heading']; ?>">
-                            </div>
-                            <div class="col-md-7">
-                                <textarea name="sections[<?php echo $sCount; ?>][content]" class="form-control summernote" rows="2"><?php echo $sec['content']; ?></textarea>
-                            </div>
-                            <div class="col-md-1">
-                                <button type="button" class="btn btn-danger btn-sm" onclick="$('#secRow_<?php echo $sCount; ?>').remove()"><i class="bi bi-trash"></i></button>
-                            </div>
+                    <?php 
+                    $sCount = 0;
+                    if(!empty($data['sections'])): foreach($data['sections'] as $sec): $sCount++; 
+                    ?>
+                    <div class="row mb-3" id="secRow_<?php echo $sCount; ?>">
+                        <div class="col-md-4">
+                            <input type="text" name="sections[<?php echo $sCount; ?>][heading]" class="form-control fw-bold" value="<?php echo $sec['heading']; ?>">
                         </div>
+                        <div class="col-md-7">
+                            <textarea name="sections[<?php echo $sCount; ?>][content]" class="form-control summernote" rows="2"><?php echo $sec['content']; ?></textarea>
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-danger btn-sm" onclick="$('#secRow_<?php echo $sCount; ?>').remove()"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </div>
                     <?php endforeach; endif; ?>
                 </div>
             </div>
 
             <div class="fixed-bottom bg-white p-3 shadow border-top text-end">
-                <a href="view_masters.php" class="btn btn-secondary me-2">Cancel</a>
-                <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-send-fill"></i> Send to Agent</button>
+                <a href="<?php echo $is_edit_mode ? 'sent_history.php' : 'view_masters.php'; ?>" class="btn btn-secondary me-2">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-send-fill"></i> <?php echo $is_edit_mode ? 'Send New Version' : 'Send to Agent'; ?></button>
             </div>
             <br><br><br>
 
@@ -196,25 +240,17 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
 
 <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
-
 <script>
     $(document).ready(function() {
-        // Initialize Summernote on existing textareas
-        $('.summernote').summernote({
-            height: 150,
-            toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['para', ['ul', 'ol', 'paragraph']]]
-        });
+        $('.summernote').summernote({ height: 150 });
 
-        // COUNTERS (Start from existing count)
         let hotelCount = <?php echo $hCount; ?>;
         let dayCount = <?php echo $dCount; ?>;
         let sectionCount = <?php echo $sCount; ?>;
 
-        // --- 1. ADD HOTEL ---
         $('#addHotelBtn').click(function() {
             hotelCount++;
-            let html = `
-            <tr id="hotelRow_${hotelCount}">
+            let html = `<tr id="hotelRow_${hotelCount}">
                 <td><input type="text" name="hotels[${hotelCount}][location]" class="form-control"></td>
                 <td><input type="text" name="hotels[${hotelCount}][name]" class="form-control"></td>
                 <td><input type="text" name="hotels[${hotelCount}][nights]" class="form-control"></td>
@@ -223,56 +259,27 @@ $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
             $('#hotelContainer').append(html);
         });
 
-        // --- 2. ADD DAY ---
         $('#addDayBtn').click(function() {
             dayCount++;
-            let html = `
-            <div class="border rounded p-3 mb-3 bg-light position-relative" id="dayRow_${dayCount}">
+            let html = `<div class="border rounded p-3 mb-3 bg-light position-relative" id="dayRow_${dayCount}">
                 <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2" onclick="$('#dayRow_${dayCount}').remove()">X</button>
-                <div class="mb-2">
-                    <label class="fw-bold">Day Title</label>
-                    <input type="text" name="days[${dayCount}][title]" class="form-control" placeholder="Day Title">
-                </div>
-                <div class="mb-2">
-                    <label>Description</label>
-                    <textarea name="days[${dayCount}][desc]" class="summernote"></textarea>
-                </div>
-                <div class="mb-2">
-                    <label>New Images</label>
-                    <input type="file" name="day_images_${dayCount}[]" class="form-control" multiple>
-                </div>
+                <div class="mb-2"><label class="fw-bold">Day Title</label><input type="text" name="days[${dayCount}][title]" class="form-control"></div>
+                <div class="mb-2"><label>Description</label><textarea name="days[${dayCount}][desc]" class="summernote"></textarea></div>
+                <div class=\"mb-2\"><label>New Images</label><input type=\"file\" name=\"day_images_${dayCount}[]\" class=\"form-control\" multiple></div>
             </div>`;
             $('#itineraryContainer').append(html);
-            
-            // Init Summernote for new element
-            $(`#dayRow_${dayCount} .summernote`).summernote({
-                height: 150,
-                toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['para', ['ul', 'ol', 'paragraph']]]
-            });
+            $(`#dayRow_${dayCount} .summernote`).summernote({ height: 150 });
         });
 
-        // --- 3. ADD SECTION ---
         $('#addSectionBtn').click(function() {
             sectionCount++;
-            let html = `
-            <div class="row mb-3" id="secRow_${sectionCount}">
-                <div class="col-md-4">
-                    <input type="text" name="sections[${sectionCount}][heading]" class="form-control fw-bold" placeholder="Heading">
-                </div>
-                <div class="col-md-7">
-                    <textarea name="sections[${sectionCount}][content]" class="form-control summernote" rows="2"></textarea>
-                </div>
-                <div class="col-md-1">
-                    <button type="button" class="btn btn-danger btn-sm" onclick="$('#secRow_${sectionCount}').remove()"><i class="bi bi-trash"></i></button>
-                </div>
+            let html = `<div class="row mb-3" id="secRow_${sectionCount}">
+                <div class="col-md-4"><input type="text" name="sections[${sectionCount}][heading]" class="form-control fw-bold"></div>
+                <div class="col-md-7"><textarea name="sections[${sectionCount}][content]" class="form-control summernote" rows="2"></textarea></div>
+                <div class="col-md-1"><button type="button" class="btn btn-danger btn-sm" onclick="$('#secRow_${sectionCount}').remove()"><i class="bi bi-trash"></i></button></div>
             </div>`;
             $('#sectionContainer').append(html);
-            
-            // INITIALIZE EDITOR
-            $(`#secRow_${sectionCount} .summernote`).summernote({
-                height: 100,
-                toolbar: [['style', ['bold', 'italic', 'underline', 'clear']], ['para', ['ul', 'ol', 'paragraph']]]
-            });
+            $(`#secRow_${sectionCount} .summernote`).summernote({ height: 100 });
         });
     });
 </script>
