@@ -2,7 +2,9 @@
 include 'includes/header.php'; 
 include 'config/db.php';
 
-if(!isset($_GET['id'])) { header("Location: sent_history.php"); exit; }
+// Security Check
+if(!isset($_SESSION['user_id'])) { header("Location: login.php"); exit; }
+if(!isset($_GET['id'])) { header("Location: dashboard.php"); exit; }
 
 $id = $_GET['id'];
 
@@ -12,14 +14,24 @@ $sql = "SELECT s.*, m.header_image, m.footer_image
         JOIN master_itineraries m ON s.master_itinerary_id = m.id 
         WHERE s.id = $id";
 
-$row = $conn->query($sql)->fetch_assoc();
-if(!$row) die("Itinerary not found.");
+$result = $conn->query($sql);
+if($result->num_rows == 0) die("Itinerary not found or access denied.");
+
+$row = $result->fetch_assoc();
+
+// Check Permission (Only the specific Agent OR Admin/Employee can view)
+if($_SESSION['role'] == 'agent' && $row['agent_id'] != $_SESSION['user_id']) {
+    die("Access Denied: This itinerary was not sent to you.");
+}
 
 // Decode JSON Data
 $data = json_decode($row['custom_content'], true);
 
-// 2. FETCH AGENTS (For the Forwarding Dropdown)
-$agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
+// 2. FETCH AGENTS (Only needed if user is staff)
+$agents = null;
+if($_SESSION['role'] != 'agent') {
+    $agents = $conn->query("SELECT id, name FROM users WHERE role='agent'");
+}
 
 // Asset Paths
 $header_img = !empty($row['header_image']) ? './assets/uploads/itineraries/'.$row['header_image'] : '';
@@ -36,12 +48,11 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
         <div class="row">
             <div class="col-sm-6"><h3>View Sent Itinerary</h3></div>
             <div class="col-sm-6 text-end">
-                <a href="sent_history.php" class="btn btn-secondary me-2">Back to History</a>
-                
-                <a href="customize_itinerary.php?sent_id=<?php echo $id; ?>" class="btn btn-warning me-2"><i class="bi bi-pencil-square"></i> Edit & Resend</a>
-
+                <?php 
+                    $back_link = ($_SESSION['role'] == 'agent') ? 'my_itineraries.php' : 'sent_history.php'; 
+                ?>
+                <a href="<?php echo $back_link; ?>" class="btn btn-secondary me-2">Back</a>
                 <a href="download_custom.php?id=<?php echo $id; ?>" class="btn btn-primary"><i class="bi bi-file-word"></i> Download Doc</a>
-
             </div>
         </div>
     </div>
@@ -50,6 +61,7 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
 <div class="app-content">
     <div class="container-fluid">
         
+        <?php if($_SESSION['role'] == 'employee' || $_SESSION['role'] == 'admin'): ?>
         <div class="card card-warning card-outline mb-4">
             <div class="card-header">
                 <h5 class="card-title"><i class="bi bi-share-fill"></i> Forward this Itinerary</h5>
@@ -68,12 +80,12 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
                         <select name="new_agent_id" class="form-select" required>
                             <option value="">-- Choose Agent --</option>
                             <?php 
-                            // Reset pointer just in case
-                            $agents->data_seek(0);
-                            while($a = $agents->fetch_assoc()): 
+                            if($agents) {
+                                $agents->data_seek(0);
+                                while($a = $agents->fetch_assoc()): 
                             ?>
                                 <option value="<?php echo $a['id']; ?>"><?php echo $a['name']; ?></option>
-                            <?php endwhile; ?>
+                            <?php endwhile; } ?>
                         </select>
                     </div>
                     
@@ -85,7 +97,7 @@ $footer_img = !empty($row['footer_image']) ? './assets/uploads/itineraries/'.$ro
                 </form>
             </div>
         </div>
-
+        <?php endif; ?>
         <div class="card mx-auto shadow-lg" style="max-width: 210mm; border: none;">
             <div class="card-body p-0">
                 

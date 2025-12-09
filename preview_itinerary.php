@@ -42,7 +42,10 @@ $footer_src = !empty($row['footer_image']) ? getBase64Image($footer_path) : '';
                 </a>
 
                 <a href="download_word.php?id=<?php echo $id; ?>" class="btn btn-primary">
-                    <i class="bi bi-file-word"></i> Download Doc
+                    <i class="bi bi-file-word"></i>Doc
+                </a>
+                <a href="download_pdf.php?id=<?php echo $id; ?>" class="btn btn-danger ms-1">
+                    <i class="bi bi-file-pdf"></i>PDF
                 </a>
             </div>
         </div>
